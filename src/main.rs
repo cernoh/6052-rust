@@ -83,9 +83,20 @@ impl CPU {
         data
     }
 
+    const INS_LDA_IM: byte = 0xA9;
+
     fn execute(&mut self, memory: &mut Mem, cycles: u32) {
         for _ in 0..cycles {
             let instruction = self.fetch_byte(memory);
+
+            match instruction {
+                CPU::INS_LDA_IM => {
+                    self.accumulator = self.fetch_byte(memory);
+                    self.flags.set_zero(self.accumulator == 0);
+                    self.flags.set_negative((self.accumulator & 0x80) != 0);
+                }
+                _ => eprintln!("instruction doesn't exist"),
+            }
         }
     }
 }
