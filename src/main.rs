@@ -1,4 +1,6 @@
 use modular_bitfield::prelude::*;
+use num_enum::TryFromPrimitive;
+use std::convert::TryFrom;
 use std::ops::Index;
 use std::ops::IndexMut;
 
@@ -13,6 +15,17 @@ struct Mem {
 impl Mem {
     fn new() -> Self {
         Mem { data: [0; MAX_MEM] }
+    }
+
+    fn write_word(&mut self, addr: usize, value: word) {
+        self.data[addr] = (value & 0xFF) as byte;
+        self.data[addr + 1] = ((value >> 8) & 0xFF) as byte;
+    }
+
+    fn read_word(&self, addr: usize) -> word {
+        let low_byte = self.data[addr] as word;
+        let high_byte = self.data[addr + 1] as word;
+        low_byte | (high_byte << 8)
     }
 }
 
@@ -30,18 +43,26 @@ impl IndexMut<usize> for Mem {
     }
 }
 
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
+enum Opcode {
+    LDA_IM = 0xA9,
+    LDA_ZP = 0x45,
+    LDA_ZPX = 0xB5,
+    JSR = 0x20,
+}
+
 #[bitfield]
 #[derive(Debug, Clone, Copy)]
 struct cpu_flags {
     carry: bool,
     zero: bool,
-    disable_inter: bool,
+    interrupt_disable: bool,
     decimal: bool,
-    break_func: bool,
+    break_command: bool,
+    unused: bool,
     overflow: bool,
     negative: bool,
-    #[skip]
-    __: B1,
 }
 
 struct CPU {
@@ -77,25 +98,95 @@ impl CPU {
         self.flags = cpu_flags::new();
     }
 
-    fn fetch_byte(&mut self, memory: &mut Mem) -> byte {
+    fn fetch_byte(&mut self, cycles: &mut u32, memory: &mut Mem) -> byte {
         let data = memory[self.program_counter as usize];
         self.program_counter += 1;
+        *cycles -= 1;
         data
     }
 
-    const INS_LDA_IM: byte = 0xA9;
+    fn read_byte(&mut self, addr: byte, cycles: &mut u32, memory: &mut Mem) -> byte {
+        *cycles -= 1;
+        memory[addr as usize]
+    }
 
-    fn execute(&mut self, memory: &mut Mem, cycles: u32) {
-        for _ in 0..cycles {
-            let instruction = self.fetch_byte(memory);
+    fn write_byte(&mut self, value: byte, addr: byte, cycles: &mut u32, memory: &mut Mem) {
+        *cycles -= 1;
+        memory[addr as usize] = value;
+    }
 
-            match instruction {
-                CPU::INS_LDA_IM => {
-                    self.accumulator = self.fetch_byte(memory);
-                    self.flags.set_zero(self.accumulator == 0);
-                    self.flags.set_negative((self.accumulator & 0x80) != 0);
+    fn write_word(&mut self, value: word, addr: word, cycles: &mut u32, memory: &mut Mem) {
+        if (addr + 1) as usize >= MAX_MEM {
+            panic!("Memory access out of bounds at address {}", addr);
+        }
+        self.write_byte((value & 0xFF) as byte, addr as byte, cycles, memory);
+        self.write_byte(
+            ((value >> 8) & 0xFF) as byte,
+            (addr + 1) as byte,
+            cycles,
+            memory,
+        );
+    }
+
+    fn fetch_word(&mut self, cycles: &mut u32, memory: &mut Mem) -> word {
+        let mut data: word = memory[self.program_counter as usize] as word;
+        self.program_counter += 1;
+        *cycles -= 1;
+
+        data |= (memory[self.program_counter as usize] as word) << 8;
+        self.program_counter += 1;
+        *cycles -= 1;
+        data
+    }
+
+    fn lda_set_status(&mut self) {
+        self.flags.set_zero(self.accumulator == 0);
+        self.flags.set_negative((self.accumulator & 0b10000000) > 0);
+    }
+
+    fn execute(&mut self, memory: &mut Mem, mut cycles: u32) {
+        while cycles > 0 {
+            let instruction = self.fetch_byte(&mut cycles, memory);
+
+            match Opcode::try_from(instruction) {
+                Ok(Opcode::LDA_IM) => {
+                    self.accumulator = self.fetch_byte(&mut cycles, memory);
+                    self.lda_set_status();
                 }
-                _ => eprintln!("instruction doesn't exist"),
+                Ok(Opcode::LDA_ZP) => {
+                    let addr = self.fetch_byte(&mut cycles, memory);
+                    self.accumulator = self.read_byte(addr, &mut cycles, memory);
+                    self.lda_set_status();
+                }
+                Ok(Opcode::LDA_ZPX) => {
+                    let mut addr = self.fetch_byte(&mut cycles, memory);
+                    addr += self.index_register_x;
+                    cycles -= 1;
+                    self.accumulator = self.read_byte(addr, &mut cycles, memory);
+                }
+                Ok(Opcode::JSR) => {
+                    let sub_addr = self.fetch_word(&mut cycles, memory);
+
+                    let return_addr = self.program_counter - 1;
+
+                    //high byte
+                    memory[self.stack_register as usize] = (return_addr >> 8 & 0xFF) as byte;
+                    self.stack_register -= 1;
+                    cycles -= 2;
+
+                    //low byte
+                    memory[self.stack_register as usize] = (return_addr & 0xFF) as byte;
+                    self.stack_register -= 1;
+                    cycles -= 2;
+
+                    self.program_counter = sub_addr;
+                }
+                Ok(op) => {
+                    eprintln!("Unimplemented instruction {:?}", op)
+                }
+                Err(_) => {
+                    eprintln!("Invalid instruction byte: {:02X}", instruction);
+                }
             }
         }
     }
@@ -104,6 +195,9 @@ impl CPU {
 fn main() {
     let mut mem = Mem::new();
     let mut cpu = CPU::default();
+    let cycles = 2;
     cpu.reset();
-    cpu.execute(&mut mem, 2);
+    mem[0xfffc] = Opcode::LDA_IM as u8;
+    mem[0xfffd] = 0x42;
+    cpu.execute(&mut mem, cycles);
 }
