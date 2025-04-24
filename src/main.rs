@@ -50,6 +50,9 @@ enum Opcode {
     LDA_ZP = 0x45,
     LDA_ZPX = 0xB5,
     JSR = 0x20,
+    ADC_IM = 0x69,
+    ADC_ZP = 0x65,
+    ADC_ZPX = 0x75,
 }
 
 #[bitfield]
@@ -139,9 +142,31 @@ impl CPU {
         data
     }
 
+    //opcode abstractions
+
+    fn adc(&mut self, value: byte) {
+        let carry_in = if self.flags.carry() { 1 } else { 0 };
+        let mut sum = self.accumulator as u16 + value as u16 + carry_in;
+        let result = sum as u8;
+
+        self.adc_set_status(&mut sum, value);
+        self.accumulator = result;
+    }
+
+    //opcode set status
     fn lda_set_status(&mut self) {
         self.flags.set_zero(self.accumulator == 0);
-        self.flags.set_negative((self.accumulator & 0b10000000) > 0);
+        self.flags
+            .set_negative((self.accumulator & 0b10000000) != 0);
+    }
+
+    fn adc_set_status(&mut self, sum: &mut word, value: byte) {
+        let result = *sum as byte;
+        self.flags.set_carry(*sum > 0xFF);
+        self.flags.set_zero(result == 0);
+        self.flags.set_negative(result & 0x80 != 0);
+        self.flags
+            .set_overflow(!(self.accumulator ^ value) & (self.accumulator ^ result) & 0x80 != 0);
     }
 
     fn execute(&mut self, memory: &mut Mem, mut cycles: u32) {
@@ -163,6 +188,24 @@ impl CPU {
                     addr += self.index_register_x;
                     cycles -= 1;
                     self.accumulator = self.read_byte(addr, &mut cycles, memory);
+                    self.lda_set_status();
+                }
+
+                Ok(Opcode::ADC_IM) => {
+                    let value = self.fetch_byte(&mut cycles, memory);
+                    self.adc(value);
+                }
+                Ok(Opcode::ADC_ZP) => {
+                    let addr = self.fetch_byte(&mut cycles, memory);
+                    let value = self.read_byte(addr, &mut cycles, memory);
+                    self.adc(value);
+                }
+                Ok(Opcode::ADC_ZPX) => {
+                    let mut addr = self.fetch_byte(&mut cycles, memory);
+                    addr += self.index_register_x;
+                    cycles -= 1;
+                    let value = self.read_byte(addr, &mut cycles, memory);
+                    self.adc(value);
                 }
                 Ok(Opcode::JSR) => {
                     let sub_addr = self.fetch_word(&mut cycles, memory);
