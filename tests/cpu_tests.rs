@@ -121,3 +121,128 @@ fn test_jsr() {
         "Stack pointer should be 0x00FD"
     );
 }
+
+#[test]
+fn test_adc_im() {
+    let mut memory = Mem::default();
+    let mut cpu = CPU::default();
+
+    // Set up the memory with the ADC Immediate instruction and the value to add
+    memory[0xFFFC] = Opcode::AdcIm as u8; // ADC Immediate opcode
+    memory[0xFFFD] = 0x10; // Value to add to the accumulator
+
+    // Initialize the accumulator and carry flag
+    cpu.reset();
+    cpu.set_accumulator(0x20); // Set accumulator to 0x20
+    cpu.set_carry_flag(false); // Ensure carry flag is cleared
+
+    // Execute the instruction
+    cpu.execute(&mut memory, 2);
+
+    // Assert that the accumulator is updated correctly
+    assert_eq!(cpu.get_accumulator(), 0x30, "Accumulator should be 0x30");
+
+    // Assert that the carry flag is cleared (no overflow)
+    assert!(!cpu.get_carry_flag(), "Carry flag should be cleared");
+
+    // Assert that the zero flag is cleared (result is not zero)
+    assert!(!cpu.get_zero_flag(), "Zero flag should be cleared");
+
+    // Assert that the negative flag is cleared (result is not negative)
+    assert!(!cpu.get_negative_flag(), "Negative flag should be cleared");
+}
+
+#[test]
+fn test_adc_zp() {
+    let mut memory = Mem::default();
+    let mut cpu = CPU::default();
+
+    // Set up the memory with the ADC Zero Page instruction and the value to add
+    memory[0xFFFC] = Opcode::AdcZp as u8; // ADC Zero Page opcode
+    memory[0xFFFD] = 0x10; // Zero Page address
+    memory[0x0010] = 0x15; // Value to add to the accumulator
+
+    // Initialize the accumulator and carry flag
+    cpu.reset();
+    cpu.set_accumulator(0x20); // Set accumulator to 0x20
+    cpu.set_carry_flag(false); // Ensure carry flag is cleared
+
+    // Execute the instruction
+    cpu.execute(&mut memory, 3);
+
+    // Assert that the accumulator is updated correctly
+    assert_eq!(cpu.get_accumulator(), 0x35, "Accumulator should be 0x35");
+
+    // Assert that the carry flag is cleared (no overflow)
+    assert!(!cpu.get_carry_flag(), "Carry flag should be cleared");
+
+    // Assert that the zero flag is cleared (result is not zero)
+    assert!(!cpu.get_zero_flag(), "Zero flag should be cleared");
+
+    // Assert that the negative flag is cleared (result is not negative)
+    assert!(!cpu.get_negative_flag(), "Negative flag should be cleared");
+}
+
+#[test]
+fn test_adc_zpx() {
+    let mut memory = Mem::default();
+    let mut cpu = CPU::default();
+
+    // Set up the memory with the ADC Zero Page, X instruction and the value to add
+    memory[0xFFFC] = Opcode::AdcZpx as u8; // ADC Zero Page, X opcode
+    memory[0xFFFD] = 0x10; // Base Zero Page address
+    memory[0x0015] = 0x15; // Value to add to the accumulator (0x10 + X = 0x15)
+
+    // Initialize the accumulator, index register X, and carry flag
+    cpu.reset();
+    cpu.set_accumulator(0x20); // Set accumulator to 0x20
+    cpu.set_index_register_x(0x05); // Set X register to 0x05
+    cpu.set_carry_flag(false); // Ensure carry flag is cleared
+
+    // Execute the instruction
+    cpu.execute(&mut memory, 4);
+
+    // Assert that the accumulator is updated correctly
+    assert_eq!(cpu.get_accumulator(), 0x35, "Accumulator should be 0x35");
+
+    // Assert that the carry flag is cleared (no overflow)
+    assert!(!cpu.get_carry_flag(), "Carry flag should be cleared");
+
+    // Assert that the zero flag is cleared (result is not zero)
+    assert!(!cpu.get_zero_flag(), "Zero flag should be cleared");
+
+    // Assert that the negative flag is cleared (result is not negative)
+    assert!(!cpu.get_negative_flag(), "Negative flag should be cleared");
+}
+
+#[test]
+fn test_adc_abs() {
+    let mut memory = Mem::default();
+    let mut cpu = CPU::default();
+
+    // Set up the memory with the ADC Absolute instruction and the value to add
+    memory[0xFFFC] = Opcode::AdcAbs as u8; // ADC Absolute opcode
+    memory[0xFFFD] = 0x00; // Low byte of absolute address
+    memory[0xFFFE] = 0x20; // High byte of absolute address
+    memory[0x2000] = 0x15; // Value to add to the accumulator
+
+    // Initialize the accumulator and carry flag
+    cpu.reset();
+    cpu.set_accumulator(0x20); // Set accumulator to 0x20
+    cpu.set_carry_flag(false); // Ensure carry flag is cleared
+
+    // Execute the instruction
+    cpu.execute(&mut memory, 4);
+
+    // Assert that the accumulator is updated correctly
+    assert_eq!(cpu.get_accumulator(), 0x35, "Accumulator should be 0x35");
+
+    // Assert that the carry flag is cleared (no overflow)
+    assert!(!cpu.get_carry_flag(), "Carry flag should be cleared");
+
+    // Assert that the zero flag is cleared (result is not zero)
+    assert!(!cpu.get_zero_flag(), "Zero flag should be cleared");
+
+    // Assert that the negative flag is cleared (result is not negative)
+    assert!(!cpu.get_negative_flag(), "Negative flag should be cleared");
+}

@@ -54,10 +54,12 @@ pub enum Opcode {
     LdaIm = 0xA9,
     LdaZp = 0x45,
     LdaZpx = 0xB5,
+    LdaAbs =  0xAD,
     Jsr = 0x20,
     AdcIm = 0x69,
     AdcZp = 0x65,
     AdcZpx = 0x75,
+    AdcAbs = 
 }
 
 #[bitfield]
@@ -132,6 +134,7 @@ impl CPU {
                     self.accumulator = self.read_byte(addr, &mut cycles, memory);
                     self.lda_set_status();
                 }
+                O
                 Ok(Opcode::AdcIm) => {
                     let value = self.fetch_byte(&mut cycles, memory);
                     self.adc(value);
@@ -152,7 +155,7 @@ impl CPU {
                     let sub_addr = self.fetch_word(&mut cycles, memory);
 
                     //TODO: return addr doesnt seem to be returning right
-                    let return_addr = self.program_counter.wrapping_sub(1);
+                    let return_addr = self.program_counter.wrapping_sub(2);
 
                     memory[self.stack_register as usize] = (return_addr >> 8 & 0xFF) as Byte;
                     self.stack_register -= 1;
