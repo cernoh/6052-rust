@@ -157,6 +157,7 @@ impl CPU {
                     self.stack_register -= 1;
                     cycles -= 2;
 
+                    // TODO: cycles seem to be functioning wrong?
                     memory[self.stack_register as usize] = (return_addr & 0xFF) as Byte;
                     self.stack_register -= 1;
                     cycles -= 2;
