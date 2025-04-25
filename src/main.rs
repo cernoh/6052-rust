@@ -151,16 +151,16 @@ impl CPU {
                 Ok(Opcode::Jsr) => {
                     let sub_addr = self.fetch_word(&mut cycles, memory);
 
+                    //TODO: return addr doesnt seem to be returning right
                     let return_addr = self.program_counter.wrapping_sub(1);
 
                     memory[self.stack_register as usize] = (return_addr >> 8 & 0xFF) as Byte;
                     self.stack_register -= 1;
                     cycles -= 2;
 
-                    // TODO: cycles seem to be functioning wrong?
                     memory[self.stack_register as usize] = (return_addr & 0xFF) as Byte;
                     self.stack_register -= 1;
-                    cycles -= 2;
+                    cycles -= 1;
 
                     self.program_counter = sub_addr;
                 }

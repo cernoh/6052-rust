@@ -111,6 +111,7 @@ fn test_jsr() {
     let return_addr_low = memory[cpu.get_stack_register() as usize + 1];
     let return_addr_high = memory[cpu.get_stack_register() as usize + 2];
     let return_addr = ((return_addr_high as u16) << 8) | return_addr_low as u16;
+
     assert_eq!(return_addr, 0xFFFD, "Return address should be 0xFFFD");
 
     // Assert that the stack pointer is decremented correctly
