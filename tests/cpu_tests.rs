@@ -1,172 +1,133 @@
-use crate::main::{CPU, Mem, Opcode};
-
-
-use modular_bitfield::prelude::*;
+use cpu6052::*;
 
 #[test]
-fn test_lda_immediate() {
-    let mut mem = Mem::new();
+fn test_cpu_reset_flags() {
     let mut cpu = CPU::default();
     cpu.reset();
 
-    mem[0xFFFC] = Opcode::LDA_IM as u8;
-    mem[0xFFFD] = 0x42; // Load value 0x42 into the accumulator
-
-    let cycles = 2;
-    cpu.execute(&mut mem, cycles);
-
-    assert_eq!(cpu.accumulator, 0x42);
-    assert!(cpu.flags.zero() == false);
-    assert!(cpu.flags.negative() == false);
+    let flags = cpu.get_flags();
+    assert!(!flags.carry);
+    assert!(!flags.zero);
+    assert!(!flags.interrupt_disable);
+    assert!(!flags.decimal_mode);
+    assert!(!flags.break_command);
+    assert!(!flags.overflow);
+    assert!(!flags.negative);
 }
 
 #[test]
-fn test_lda_zero_flag() {
+fn test_cpu_sta_absolute() {
     let mut mem = Mem::new();
     let mut cpu = CPU::default();
     cpu.reset();
 
-    mem[0xFFFC] = Opcode::LDA_IM as u8;
-    mem[0xFFFD] = 0x00; // Load value 0x00 into the accumulator
-
-    let cycles = 2;
-    cpu.execute(&mut mem, cycles);
-
-    assert_eq!(cpu.accumulator, 0x00);
-    assert!(cpu.flags.zero() == true);
-    assert!(cpu.flags.negative() == false);
-}
-
-#[test]
-fn test_adc_immediate() {
-    let mut mem = Mem::new();
-    let mut cpu = CPU::default();
-    cpu.reset();
-
-    cpu.accumulator = 0x10;
-    mem[0xFFFC] = Opcode::ADC_IM as u8;
-    mem[0xFFFD] = 0x20; // Add 0x20 to the accumulator
-
-    let cycles = 2;
-    cpu.execute(&mut mem, cycles);
-
-    assert_eq!(cpu.accumulator, 0x30);
-    assert!(cpu.flags.carry() == false);
-    assert!(cpu.flags.zero() == false);
-    assert!(cpu.flags.negative() == false);
-}
-
-#[test]
-fn test_adc_with_carry() {
-    let mut mem = Mem::new();
-    let mut cpu = CPU::default();
-    cpu.reset();
-
-    cpu.accumulator = 0xFF;
-    mem[0xFFFC] = Opcode::ADC_IM as u8;
-    mem[0xFFFD] = 0x01; // Add 0x01 to the accumulator
-
-    let cycles = 2;
-    cpu.execute(&mut mem, cycles);
-
-    assert_eq!(cpu.accumulator, 0x00); // Result wraps around
-    assert!(cpu.flags.carry() == true);
-    assert!(cpu.flags.zero() == true);
-    assert!(cpu.flags.negative() == false);
-}
-
-#[test]
-fn test_jsr() {
-    let mut mem = Mem::new();
-    let mut cpu = CPU::default();
-    cpu.reset();
-
-    mem[0xFFFC] = Opcode::JSR as u8;
+    mem[0xFFFC] = Opcode::StaAbs as u8;
     mem[0xFFFD] = 0x00;
-    mem[0xFFFE] = 0x20; // Jump to address 0x2000
+    mem[0xFFFE] = 0x20;
 
-    let cycles = 6;
-    cpu.execute(&mut mem, cycles);
+    cpu.set_accumulator(0x55);
+    cpu.execute(&mut mem, 4);
 
-    assert_eq!(cpu.program_counter, 0x2000);
-    assert_eq!(mem[cpu.stack_register as usize + 1], 0xFD); // Check return address pushed to stack
-    assert_eq!(mem[cpu.stack_register as usize + 2], 0xFF);
+    assert_eq!(mem[0x2000], 0x55);
 }
 
 #[test]
-fn test_lda_zero_page() {
+fn test_cpu_inx() {
     let mut mem = Mem::new();
     let mut cpu = CPU::default();
     cpu.reset();
 
-    mem[0xFFFC] = Opcode::LDA_ZP as u8;
-    mem[0xFFFD] = 0x10; // Load value from zero-page address 0x10
-    mem[0x0010] = 0x42;
+    mem[0xFFFC] = Opcode::Inx as u8;
 
-    let cycles = 3;
-    cpu.execute(&mut mem, cycles);
+    cpu.set_index_register_x(0xFE);
+    cpu.execute(&mut mem, 2);
 
-    assert_eq!(cpu.accumulator, 0x42);
-    assert!(cpu.flags.zero() == false);
-    assert!(cpu.flags.negative() == false);
+    assert_eq!(cpu.get_index_register_x(), 0xFF);
+    assert!(!cpu.get_zero_flag());
+    assert!(cpu.get_negative_flag());
+
+    cpu.execute(&mut mem, 2);
+
+    assert_eq!(cpu.get_index_register_x(), 0x00);
+    assert!(cpu.get_zero_flag());
+    assert!(!cpu.get_negative_flag());
 }
 
 #[test]
-fn test_lda_zero_page_x() {
+fn test_cpu_bne() {
     let mut mem = Mem::new();
     let mut cpu = CPU::default();
     cpu.reset();
 
-    cpu.index_register_x = 0x01;
-    mem[0xFFFC] = Opcode::LDA_ZPX as u8;
-    mem[0xFFFD] = 0x10; // Load value from zero-page address 0x10 + X
-    mem[0x0011] = 0x42;
+    mem[0xFFFC] = Opcode::Bne as u8;
+    mem[0xFFFD] = 0x02;
 
-    let cycles = 4;
-    cpu.execute(&mut mem, cycles);
+    cpu.set_zero_flag(false);
+    cpu.execute(&mut mem, 2);
 
-    assert_eq!(cpu.accumulator, 0x42);
-    assert!(cpu.flags.zero() == false);
-    assert!(cpu.flags.negative() == false);
+    assert_eq!(cpu.get_program_counter(), 0xFFFE);
+
+    cpu.set_zero_flag(true);
+    cpu.reset();
+    cpu.execute(&mut mem, 2);
+
+    assert_eq!(cpu.get_program_counter(), 0xFFFD);
 }
 
 #[test]
-fn test_adc_zero_page() {
+fn test_cpu_lda_zero_flag() {
     let mut mem = Mem::new();
     let mut cpu = CPU::default();
     cpu.reset();
 
-    cpu.accumulator = 0x10;
-    mem[0xFFFC] = Opcode::ADC_ZP as u8;
-    mem[0xFFFD] = 0x10; // Add value from zero-page address 0x10
-    mem[0x0010] = 0x20;
+    mem[0xFFFC] = Opcode::LdaIm as u8;
+    mem[0xFFFD] = 0x00;
 
-    let cycles = 3;
-    cpu.execute(&mut mem, cycles);
+    cpu.execute(&mut mem, 2);
 
-    assert_eq!(cpu.accumulator, 0x30);
-    assert!(cpu.flags.carry() == false);
-    assert!(cpu.flags.zero() == false);
-    assert!(cpu.flags.negative() == false);
+    assert_eq!(cpu.get_accumulator(), 0x00);
+    assert!(cpu.get_zero_flag());
+    assert!(!cpu.get_negative_flag());
 }
 
 #[test]
-fn test_adc_zero_page_x() {
+fn test_cpu_adc_with_carry() {
     let mut mem = Mem::new();
     let mut cpu = CPU::default();
     cpu.reset();
 
-    cpu.accumulator = 0x10;
-    cpu.index_register_x = 0x01;
-    mem[0xFFFC] = Opcode::ADC_ZPX as u8;
-    mem[0xFFFD] = 0x10; // Add value from zero-page address 0x10 + X
-    mem[0x0011] = 0x20;
+    mem[0xFFFC] = Opcode::AdcIm as u8;
+    mem[0xFFFD] = 0x10;
 
-    let cycles = 4;
-    cpu.execute(&mut mem, cycles);
+    cpu.set_accumulator(0xF0);
+    cpu.set_carry_flag(true);
 
-    assert_eq!(cpu.accumulator, 0x30);
-    assert!(cpu.flags.carry() == false);
-    assert!(cpu.flags.zero() == false);
-    assert!(cpu.flags.negative() == false);
+    cpu.execute(&mut mem, 2);
+
+    assert_eq!(cpu.get_accumulator(), 0x01);
+    assert!(cpu.get_carry_flag());
+    assert!(!cpu.get_zero_flag());
+    assert!(cpu.get_negative_flag());
+}
+
+#[test]
+fn test_cpu_jsr() {
+    let mut mem = Mem::new();
+    let mut cpu = CPU::default();
+    cpu.reset();
+    mem[0xFFFC] = Opcode::Jsr as u8;
+    mem[0xFFFD] = 0x00;
+    mem[0xFFFE] = 0x20;
+    let initial_stack = cpu.get_stack_register();
+    cpu.execute(&mut mem, 6);
+
+    // Check program counter is updated
+    assert_eq!(cpu.get_program_counter(), 0x2000);
+
+    // Check stack has been updated correctly
+    assert_eq!(cpu.get_stack_register(), initial_stack - 2);
+
+    // Check return address was stored correctly (low byte at stack+1, high byte at stack+2)
+    assert_eq!(mem[(initial_stack) as usize], 0xFE); // Low byte
+    assert_eq!(mem[(initial_stack - 1) as usize], 0xFF); // High byte
 }

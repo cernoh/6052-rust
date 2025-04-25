@@ -1,3 +1,4 @@
+use modular_bitfield::prelude::*;
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
 use std::ops::{Index, IndexMut};
@@ -27,6 +28,12 @@ impl Mem {
     }
 }
 
+impl Default for Mem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Index<usize> for Mem {
     type Output = Byte;
 
@@ -53,6 +60,7 @@ pub enum Opcode {
     AdcZpx = 0x75,
 }
 
+#[bitfield]
 #[derive(Debug, Clone, Copy)]
 pub struct CpuFlags {
     carry: bool,
@@ -65,38 +73,9 @@ pub struct CpuFlags {
     negative: bool,
 }
 
-impl CpuFlags {
-    pub fn new() -> Self {
-        CpuFlags {
-            carry: false,
-            zero: false,
-            interrupt_disable: false,
-            decimal: false,
-            break_command: false,
-            unused: false,
-            overflow: false,
-            negative: false,
-        }
-    }
-
-    pub fn carry(&self) -> bool {
-        self.carry
-    }
-
-    pub fn set_carry(&mut self, value: bool) {
-        self.carry = value;
-    }
-
-    pub fn set_zero(&mut self, value: bool) {
-        self.zero = value;
-    }
-
-    pub fn set_negative(&mut self, value: bool) {
-        self.negative = value;
-    }
-
-    pub fn set_overflow(&mut self, value: bool) {
-        self.overflow = value;
+impl Default for CpuFlags {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -222,7 +201,7 @@ impl CPU {
 
     fn adc(&mut self, value: Byte) {
         let carry_in = if self.flags.carry() { 1 } else { 0 };
-        let mut sum = self.accumulator as u16 + value as u16 + carry_in;
+        let sum = self.accumulator as u16 + value as u16 + carry_in;
         let result = sum as u8;
 
         self.flags.set_carry(sum > 0xFF);
@@ -232,6 +211,77 @@ impl CPU {
             .set_overflow(!(self.accumulator ^ value) & (self.accumulator ^ result) & 0x80 != 0);
 
         self.accumulator = result;
+    }
+
+    //getters for flags for testing
+    pub fn get_carry_flag(&self) -> bool {
+        self.flags.carry()
+    }
+    pub fn get_zero_flag(&self) -> bool {
+        self.flags.zero()
+    }
+    pub fn get_interrupt_disable_flag(&self) -> bool {
+        self.flags.interrupt_disable()
+    }
+    pub fn get_decimal_flag(&self) -> bool {
+        self.flags.decimal()
+    }
+    pub fn get_break_command_flag(&self) -> bool {
+        self.flags.break_command()
+    }
+    pub fn get_overflow_flag(&self) -> bool {
+        self.flags.overflow()
+    }
+    pub fn get_negative_flag(&self) -> bool {
+        self.flags.negative()
+    }
+
+    // setters for flags for testing
+    pub fn set_carry_flag(&mut self, value: bool) {
+        self.flags.set_carry(value);
+    }
+    pub fn set_zero_flag(&mut self, value: bool) {
+        self.flags.set_zero(value);
+    }
+    pub fn set_interrupt_disable_flag(&mut self, value: bool) {
+        self.flags.set_interrupt_disable(value);
+    }
+    pub fn set_decimal_flag(&mut self, value: bool) {
+        self.flags.set_decimal(value);
+    }
+    pub fn set_break_command_flag(&mut self, value: bool) {
+        self.flags.set_break_command(value);
+    }
+    pub fn set_overflow_flag(&mut self, value: bool) {
+        self.flags.set_overflow(value);
+    }
+    pub fn set_negative_flag(&mut self, value: bool) {
+        self.flags.set_negative(value);
+    }
+
+    //getters for CPU registers for testing
+    pub fn get_stack_register(&self) -> Word {
+        self.stack_register
+    }
+    pub fn get_program_counter(&self) -> Word {
+        self.program_counter
+    }
+    pub fn get_accumulator(&self) -> Byte {
+        self.accumulator
+    }
+    pub fn get_index_register_x(&self) -> Byte {
+        self.index_register_x
+    }
+    pub fn get_index_register_y(&self) -> Byte {
+        self.index_register_y
+    }
+    pub fn get_flags(&self) -> CpuFlags {
+        self.flags
+    }
+
+    //setters for CPU registers for testing
+    pub fn set_accumulator(&mut self, value: Byte) {
+        self.accumulator = value;
     }
 }
 

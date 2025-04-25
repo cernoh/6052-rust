@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "cpu-6052"
+name = "cpu6052"
 version = "0.1.0"
 dependencies = [
  "modular-bitfield",
