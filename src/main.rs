@@ -283,6 +283,20 @@ impl CPU {
     pub fn set_accumulator(&mut self, value: Byte) {
         self.accumulator = value;
     }
+
+    pub fn set_index_register_x(&mut self, value: Byte) {
+        self.index_register_x = value;
+    }
+
+    pub fn set_index_register_y(&mut self, value: Byte) {
+        self.index_register_y = value;
+    }
+    pub fn set_program_counter(&mut self, value: Word) {
+        self.program_counter = value;
+    }
+    pub fn set_stack_register(&mut self, value: Word) {
+        self.stack_register = value;
+    }
 }
 
 fn main() {
