@@ -48,6 +48,7 @@ impl IndexMut<usize> for Mem {
     }
 }
 
+// found here : https://web.archive.org/web/20181019030759/http://obelisk.me.uk/6502/reference.html
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, TryFromPrimitive)]
 pub enum Opcode {
