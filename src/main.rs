@@ -55,6 +55,10 @@ pub enum Opcode {
     LdaZp = 0x45,
     LdaZpx = 0xB5,
     LdaAbs = 0xAD,
+    LdaAbsX = 0xBD,
+    LdaAbsY = 0xB9,
+    LdaInX = 0xA1,
+    LdaInY = 0xB1,
     Jsr = 0x20,
     AdcIm = 0x69,
     AdcZp = 0x65,
@@ -134,7 +138,71 @@ impl CPU {
                     self.accumulator = self.read_byte(addr, &mut cycles, memory);
                     self.lda_set_status();
                 }
-                Ok(Opcode::LdaAbs) => {}
+                Ok(Opcode::LdaAbs) => {
+                    let addr = self.fetch_word(&mut cycles, memory);
+                    self.accumulator = memory[addr as usize];
+                    cycles -= 2;
+                    self.lda_set_status();
+                }
+                Ok(Opcode::LdaAbsX) => {
+                    let base_addr = self.fetch_word(&mut cycles, memory);
+                    let addr = base_addr + self.index_register_x as u16;
+                    self.accumulator = memory[addr as usize];
+
+                    let page_crossed = (base_addr & 0xFF00)
+                        != ((base_addr + self.index_register_x as u16) & 0xFF00);
+                    cycles -= 2;
+                    if page_crossed {
+                        cycles -= 1;
+                    }
+                    self.lda_set_status();
+                }
+                Ok(Opcode::LdaAbsY) => {
+                    let base_addr = self.fetch_word(&mut cycles, memory);
+                    let addr = base_addr + self.index_register_y as u16;
+                    self.accumulator = memory[addr as usize];
+
+                    let page_crossed = (base_addr & 0xFF00)
+                        != ((base_addr + self.index_register_y as u16) & 0xFF00);
+                    cycles -= 2;
+                    if page_crossed {
+                        cycles -= 1;
+                    }
+                    self.lda_set_status();
+                }
+                Ok(Opcode::LdaInX) => {
+                    let zero_page_addr = self.fetch_byte(&mut cycles, memory);
+                    let indirect_addr = (zero_page_addr + self.index_register_x) & 0xFF;
+                    cycles -= 1;
+
+                    let effective_addr_low = memory[indirect_addr as usize] as Word;
+                    let effective_addr_high = memory[(indirect_addr as usize) & 0xFF] as Word;
+                    let effective_addr = effective_addr_low | (effective_addr_high << 8);
+                    cycles -= 2;
+
+                    self.accumulator = memory[effective_addr as usize];
+                    cycles -= 1;
+                    self.lda_set_status();
+                }
+                Ok(Opcode::LdaInY) => {
+                    let zero_page_addr = self.fetch_byte(&mut cycles, memory);
+
+                    let indirect_addr_low = memory[zero_page_addr as usize] as Word;
+                    let indirect_addr_high = memory[(zero_page_addr as usize) & 0xFF] as Word;
+                    let base_addr = indirect_addr_low | (indirect_addr_high << 8);
+                    cycles -= 2;
+
+                    let page_crossed = (base_addr & 0xFF00)
+                        != ((base_addr + self.index_register_y as u16) & 0xFF00);
+                    let effective_addr = base_addr + self.index_register_y as u16;
+
+                    self.accumulator = memory[effective_addr as usize];
+                    cycles -= 1;
+                    if page_crossed {
+                        cycles -= 1;
+                    }
+                    self.lda_set_status();
+                }
                 Ok(Opcode::AdcIm) => {
                     let value = self.fetch_byte(&mut cycles, memory);
                     self.adc(value);
@@ -166,6 +234,9 @@ impl CPU {
                     cycles -= 1;
 
                     self.program_counter = sub_addr;
+                }
+                Ok(Opcode::AdcAbs) => {
+                    todo!()
                 }
                 Err(_) => {
                     eprintln!("Invalid instruction byte: {:02X}", instruction);
