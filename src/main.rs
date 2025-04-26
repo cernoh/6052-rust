@@ -65,6 +65,7 @@ pub enum Opcode {
     AdcZp = 0x65,
     AdcZpx = 0x75,
     AdcAbs = 0x6D,
+    AdcAbsX = 0x7D,
 }
 
 #[bitfield]
@@ -220,6 +221,25 @@ impl CPU {
                     let value = self.read_byte(addr, &mut cycles, memory);
                     self.adc(value);
                 }
+                Ok(Opcode::AdcAbs) => {
+                    let addr = self.fetch_word(&mut cycles, memory);
+                    self.adc(memory[addr as usize]);
+                    cycles -= 1;
+                }
+                Ok(Opcode::AdcAbsX) => {
+                    let base_addr = self.fetch_word(&mut cycles, memory);
+                    let addr = base_addr + self.index_register_x as u16;
+
+                    let page_crossed =
+                        (base_addr & 0xFF00) != ((base_addr + self.index_register_x) & 0xFF00);
+                    cycles -= 2;
+                    if page_crossed {
+                        cycles -= 1;
+                    }
+
+                    self.adc(addr);
+                }
+
                 Ok(Opcode::Jsr) => {
                     let sub_addr = self.fetch_word(&mut cycles, memory);
 
@@ -236,9 +256,7 @@ impl CPU {
 
                     self.program_counter = sub_addr;
                 }
-                Ok(Opcode::AdcAbs) => {
-                    todo!()
-                }
+
                 Err(_) => {
                     eprintln!("Invalid instruction byte: {:02X}", instruction);
                 }
