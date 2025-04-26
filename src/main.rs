@@ -54,12 +54,12 @@ pub enum Opcode {
     LdaIm = 0xA9,
     LdaZp = 0x45,
     LdaZpx = 0xB5,
-    LdaAbs =  0xAD,
+    LdaAbs = 0xAD,
     Jsr = 0x20,
     AdcIm = 0x69,
     AdcZp = 0x65,
     AdcZpx = 0x75,
-    AdcAbs = 
+    AdcAbs = 0x6D,
 }
 
 #[bitfield]
@@ -134,7 +134,7 @@ impl CPU {
                     self.accumulator = self.read_byte(addr, &mut cycles, memory);
                     self.lda_set_status();
                 }
-                O
+                Ok(Opcode::LdaAbs) => {}
                 Ok(Opcode::AdcIm) => {
                     let value = self.fetch_byte(&mut cycles, memory);
                     self.adc(value);
